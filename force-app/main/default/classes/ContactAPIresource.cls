@@ -48,10 +48,47 @@ global with sharing class ContactAPIresource {
         return contact;
     }
 
+    //To delete Multiple contacts using API
     @HTTPDelete
-    global static Map<String, String> deleteContact(){
-        Map<String, String> responseMap = new Map<String, String>();
-        
+    global static List<ResponseWrapper> deleteContact(){
+        List<ResponseWrapper> responseWrapperList = new List<ResponseWrapper>();
+        RestRequest contactRequest = RestContext.request;
+
+        String contactRequestURI = contactRequest.requestURI;   \\ To Get Request URI
+        String[] contactIdsToDelete =(contactRequestURI.substring(contactRequestURI.lastIndexof('/')+1)).split(','); // adding Ids To list
+
+        List<Contact> contactsToDelete = new List<Contact>();
+
+        for(String contactId : contactIdsToDelete){
+            Contact contact = new Contact(Id=contactId); // referencing the Id To Contact Object
+            contactsToDelete.add(contact);
+        }
+
+        //Deleting contacts with partial success enabled
+        Database.DeleteResult[] deleteResults = Database.delete(contactsToDelete,false);
+        for(Database.DeleteResult deleteResult :deleteResults){
+            ResponseWrapper wrapper = new ResponseWrapper();
+            if(deleteResult.IsSuccess()){
+                wrapper.success ='1';
+                wrapper.message ='Successfully Deleted Contact with Id:  '+ deleteResult.getId();
+            }
+            else{
+                wrapper.success = '0';
+                for(Database.Error error : deleteResult.getErrors()){
+                    wrapper.message = ' The following Error has occurred for Contact With Id:  '+ deleteResult.getId();
+                    wrapper.message += error.getStatusCode()+' : ' + error.getMessage()+'. ';
+                    wrapper.message+= 'Contact Fields that affected this error : '+ error.getFields();
+                }
+            }
+            responseWrapperList.add(wrapper);  // adding all the success & error message to the list
+        }
+        return responseWrapperList; 
+    }
+
+    //for handling error & success message
+    global class ResponseWrapper{
+        String success;
+        String message;
     }
 
 }
